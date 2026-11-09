@@ -1,0 +1,6 @@
+{
+  "tools": [
+    {"name":"get_onboarding_progress","description":"Read the current authenticated user's onboarding checklist.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"sideEffects":false},
+    {"name":"complete_onboarding_step","description":"Complete one allowlisted onboarding step after explicit user confirmation.","inputSchema":{"type":"object","properties":{"step_id":{"type":"string"}},"required":["step_id"],"additionalProperties":false},"sideEffects":true,"requiresUserConfirmation":true}
+  ]
+}
