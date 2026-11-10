@@ -1,2 +1,485 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-:root{font-family:Inter,Arial,sans-serif;color:#141414;background:#f7f8f5;font-synthesis:none;text-rendering:optimizeLegibility}*{box-sizing:border-box}body{margin:0}.layout{max-width:1180px;margin:auto;padding:26px 34px 18px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7e2;padding-bottom:18px}.brand{font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px}.dot{width:14px;height:14px;border-radius:50%;background:#00d96f;display:inline-block}.subtitle,.hint,footer{color:#6f746f;font-size:13px}.intro{display:flex;justify-content:space-between;align-items:center;padding:34px 0 28px;gap:20px}.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;color:#666;margin:0 0 8px}.intro h1{font-size:34px;margin:0 0 8px;letter-spacing:-.04em}.lead{color:#5e635f;margin:0;max-width:590px}.mentor{background:#e8fbdc;border-radius:14px;padding:17px 20px;font-weight:600;max-width:235px}.mentor span{display:block;font-weight:400;font-size:12px;color:#596354;margin-top:6px;line-height:1.45}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:#fff;border:1px solid #eaede8;border-radius:16px;padding:22px;min-height:480px;box-shadow:0 5px 20px #25301408}.panel-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}.panel-title h2{font-size:20px;margin:0}.count,.online{font-size:12px;color:#535852;background:#f1f4ef;padding:7px 10px;border-radius:20px}.online{color:#16854b;background:#e8f8ed}ol{list-style:none;padding:0;margin:0}li{display:flex;align-items:flex-start;gap:12px;padding:15px 0;border-top:1px solid #eff1ed}.step-no{color:#899087;font-size:12px;padding-top:2px}.step-copy{flex:1}.step-copy strong{font-size:14px}.step-copy p{color:#737870;font-size:12px;line-height:1.45;margin:5px 0 0}.done strong{text-decoration:line-through;color:#818781}button{cursor:pointer;border:0;border-radius:8px;padding:9px 12px;font:inherit;font-size:12px;font-weight:600;background:#00d96f;color:#092d19}button:disabled{cursor:default;background:#e5e9e3;color:#646b63}.plain{background:transparent;color:#2466c2;padding:0}.chat{display:flex;flex-direction:column}.messages{height:330px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:2px 2px 16px}.message{max-width:90%;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.55}.message.assistant{background:#f2f4f0;align-self:flex-start}.message.user{background:#e1f9e9;align-self:flex-end}.message.muted{color:#777}.source{display:block;color:#398154;font-size:11px;margin-top:7px;text-decoration:underline}.composer{display:flex;gap:8px;border-top:1px solid #edf0eb;padding-top:14px}.composer input{min-width:0;flex:1;border:1px solid #dfe4dd;border-radius:9px;padding:11px 12px;font:inherit;font-size:12px;outline-color:#00bd60}.hint{font-size:10px;margin:10px 0 0}.error{font-size:12px;color:#b22}footer{display:flex;justify-content:space-between;padding-top:18px;font-size:11px}@media(max-width:800px){.layout{padding:18px}.grid{grid-template-columns:1fr}.panel{min-height:unset}.intro{align-items:flex-start;flex-direction:column}.mentor{max-width:100%;width:100%}.messages{height:290px}}
+/*
+  Идея: главный объект интерфейса — заявка. Черновик выглядит как бланк с пунктирной рамкой,
+  отправленная заявка получает сплошную рамку и штамп с номером. Остальное намеренно спокойное.
+*/
+
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #1d2430;
+  --ink-soft: #5a6472;
+  --line: #d5dbe3;
+  --accent: #2b59c3;
+  --accent-hover: #234aa5;
+  --accent-soft: #e6edfb;
+  --pending: #a15c00;
+  --pending-soft: #fff3df;
+  --success: #1f7a4d;
+  --success-soft: #e3f4ea;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --focus: rgba(43, 89, 195, 0.45);
+  --font: 'Golos Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+/* Каркас */
+
+.layout {
+  max-width: 1120px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.brand {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.mode-badge {
+  padding: 2px 10px;
+  border: 1px dashed var(--ink-soft);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+}
+
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.footer {
+  padding-top: 16px;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* Кнопки */
+
+.button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 18px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.button:disabled {
+  background: #c9d1dc;
+  color: #4d5866;
+  cursor: default;
+}
+
+.button-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Мои заявки */
+
+.requests {
+  padding-top: 16px;
+}
+
+.requests h2 {
+  margin-bottom: 16px;
+  font-size: 1.125rem;
+}
+
+.request {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.request-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.request-kind {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.request-number {
+  margin-top: 6px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.request-when {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.next-step {
+  margin-top: 24px;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.next-step h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.inline-error {
+  color: var(--danger);
+}
+
+/* Статусы */
+
+.badge {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-pending {
+  background: var(--pending-soft);
+  color: var(--pending);
+}
+
+.badge-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge-neutral {
+  background: var(--bg);
+  color: var(--ink-soft);
+}
+
+/* Чат */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 600px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.chat-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-head h2 {
+  font-size: 1.125rem;
+}
+
+.chat-head p {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.messages {
+  flex: 1;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  max-width: 64ch;
+}
+
+.message.user {
+  align-self: flex-end;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  border-radius: 14px 14px 4px 14px;
+}
+
+.message.assistant {
+  align-self: flex-start;
+}
+
+.message.pending {
+  color: var(--ink-soft);
+}
+
+.message.failed {
+  color: var(--danger);
+}
+
+.message.failed .button-link {
+  margin-top: 4px;
+}
+
+.sources {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.tag {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg);
+  font-size: 0.75rem;
+}
+
+.composer-area {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  padding: 6px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.chip:disabled {
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.composer input:focus-visible {
+  border-color: var(--accent);
+}
+
+/* Карточка заявки: черновик → отправленная заявка */
+
+.slip {
+  width: min(100%, 380px);
+  margin-top: 12px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1.5px dashed rgba(43, 89, 195, 0.55);
+  border-radius: 6px;
+}
+
+.slip.filed {
+  border-style: solid;
+  border-color: var(--line);
+}
+
+.slip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.slip-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.slip-state {
+  font-size: 0.8125rem;
+  color: var(--accent);
+}
+
+.slip-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 12px 0 16px;
+}
+
+.slip-fields dt {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.slip-fields dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.slip-error {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.stamp {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  color: var(--pending);
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transform: rotate(-3deg);
+  animation: stamp 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-3deg) scale(1.4);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
+.slip-note {
+  margin-top: 10px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.slip-unsupported {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .layout {
+    padding: 0 16px 16px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .chat {
+    order: -1;
+    min-height: 70vh;
+  }
+
+  .messages {
+    max-height: none;
+  }
+}
