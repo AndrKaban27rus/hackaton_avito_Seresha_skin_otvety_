@@ -43,7 +43,23 @@ cd backend && go run ./cmd/api
 cd frontend && npm install && npm run dev
 ```
 
-Для запуска вне Compose задайте `DATABASE_URL`, `REDIS_ADDR`, `KAFKA_BROKERS`, `PORT`. Миграция SQL применяется при старте API. UI использует `http://localhost:8080` (можно переопределить `VITE_API_URL`).
+Для запуска вне Compose задайте `DATABASE_URL`, `REDIS_ADDR`, `KAFKA_BROKERS`, `PORT`. Миграция SQL применяется при старте API.
+
+UI обращается к `/api` на своём же адресе. В Docker запросы проксирует nginx на контейнер `api`, в `npm run dev` — Vite на `http://localhost:8080` (адрес меняется переменной `API_PROXY_TARGET`). Отдельный адрес API можно задать при сборке через `VITE_API_URL`.
+
+Фронтенд без бэкенда, на моках в браузере (данные хранятся в localStorage):
+
+```bash
+cd frontend && npm install && npm run dev:mock
+```
+
+Тесты фронтенда и отчёт о покрытии (`frontend/coverage/index.html`, порог 80% строк):
+
+```bash
+cd frontend && npm run test:coverage
+```
+
+Контракт сценария «Учебный отгул» между фронтендом и бэкендом: `docs/api-absence-scenario.md`.
 
 ## Команды разработки
 
