@@ -1,0 +1,147 @@
+{
+  "profiles": {
+    "intern_01": {
+      "role": "intern",
+      "name": "Алексей Сергеевич Ким",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": [
+        "search_dev"
+      ],
+      "lead_id": "lead_01"
+    },
+    "lead_01": {
+      "role": "lead",
+      "name": "Мария Андреевна Волкова",
+      "team": "Поиск",
+      "grade": null
+    },
+    "intern_02": {
+      "role": "intern",
+      "name": "Елена Игоревна Орлова",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": ["search_dev"],
+      "lead_id": "lead_01"
+    },
+    "intern_03": {
+      "role": "intern",
+      "name": "Илья Андреевич Соколов",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": ["search_dev"],
+      "lead_id": "lead_01"
+    }
+  },
+  "tickets": [
+    {
+      "id": "BACK-104",
+      "team": "Поиск",
+      "title": "Уточнить логирование в сервисе профилей",
+      "description": "Улучшить диагностические события.",
+      "requires": [
+        "profiles_ki"
+      ],
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "confidential",
+      "grades": [
+        "E1"
+      ]
+    },
+    {
+      "id": "BACK-112",
+      "team": "Поиск",
+      "title": "Проверить кэширование фильтров поиска",
+      "description": "Сравнить p95 задержки с кэшем и без кэша на одном тестовом наборе.",
+      "requires": [
+        "search_dev"
+      ],
+      "okr_priority": 2,
+      "demo_rationale": "Задача поддерживает цель команды по ускорению поиска. Сравнение p95 на одинаковом наборе покажет, влияет ли кэш на скорость.",
+      "demo_first_step": "Открой тестовый набор запросов и замерь p95 при выключенном кэше.",
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "internal",
+      "grades": [
+        "E1"
+      ]
+    },
+    {
+      "id": "BACK-118",
+      "team": "Поиск",
+      "title": "Дополнить тесты фильтров поиска",
+      "description": "Добавить проверки пустого результата и сочетания фильтров.",
+      "requires": [
+        "search_dev"
+      ],
+      "okr_priority": 1,
+      "demo_rationale": "Тесты дадут команде стабильный набор запросов для будущих измерений.",
+      "demo_first_step": "Открой существующие тесты фильтров и найди фикстуру запроса без результатов.",
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "internal",
+      "grades": [
+        "E1"
+      ]
+    },
+    {
+      "id": "BACK-121",
+      "team": "Поиск",
+      "title": "Проверить сервис индексации",
+      "description": "Тестовая задача для проверки неизвестной классификации.",
+      "requires": [],
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "grades": [
+        "E1"
+      ]
+    },
+    {
+      "id": "BACK-130",
+      "team": "Поиск",
+      "title": "Пересмотреть схему индекса",
+      "description": "Тестовая задача для E2.",
+      "requires": [],
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "internal",
+      "grades": [
+        "E2"
+      ]
+    }
+  ],
+  "team_goal": "Ускорить выдачу результатов поиска. В стартовых задачах приоритет у изменений с проверяемым результатом.",
+  "channels": [
+    {
+      "id": "general",
+      "name": "общий",
+      "messages": [
+        {
+          "author": "Мария Волкова",
+          "text": "Привет! Здесь обсуждаем новости команды «Поиск»."
+        }
+      ]
+    },
+    {
+      "id": "onboarding",
+      "name": "стажировка",
+      "messages": [
+        {
+          "author": "Мария Волкова",
+          "text": "За первой задачей обращайтесь к AI-buddy в личных сообщениях."
+        }
+      ]
+    }
+  ]
+}

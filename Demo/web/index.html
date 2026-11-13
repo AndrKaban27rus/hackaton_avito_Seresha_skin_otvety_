@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Avito · Slack · AI-buddy</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <span class="workspace-icon" aria-hidden="true">A</span>
+    <strong>Avito</strong>
+    <span class="demo-label">Демо Slack</span>
+    <label class="profile-label" for="profile">Тестовый профиль</label>
+    <select id="profile" aria-label="Тестовый профиль" disabled></select>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Рабочее пространство">
+      <nav aria-label="Каналы и личные сообщения">
+        <h2>Каналы</h2>
+        <div id="channels"></div>
+        <h2>Личные сообщения</h2>
+        <button id="bot-chat" type="button" aria-current="true">
+          <span class="bot-icon" aria-hidden="true">✦</span> AI-buddy
+          <span id="notification-count" class="count" hidden></span>
+        </button>
+      </nav>
+    </aside>
+    <main class="conversation">
+      <header class="conversation-header">
+        <div>
+          <h1 id="conversation-name">AI-buddy</h1>
+          <p id="conversation-detail">Личные сообщения</p>
+        </div>
+        <div class="conversation-actions">
+          <button id="reset-chat" type="button" hidden>Сбросить чат</button>
+          <button id="restart-pick" type="button" title="Очистить чат и снять тестовое назначение" hidden>Начать подбор заново</button>
+        </div>
+      </header>
+      <section class="messages" id="messages" aria-label="Сообщения" aria-live="polite">
+        <ol id="history"></ol>
+      </section>
+      <div class="compose-area">
+        <p id="notice" role="status"></p>
+        <form id="composer" hidden>
+          <label class="visually-hidden" for="message">Сообщение AI-buddy</label>
+          <div class="input-row">
+            <textarea id="message" rows="2" maxlength="1200" required placeholder="Написать AI-buddy"></textarea>
+            <button type="submit" class="send">Отправить</button>
+          </div>
+          <div class="compose-footer">
+            <button id="suggestion" type="button">Подбери мне стартовую задачу</button>
+            <small id="mode"></small>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
