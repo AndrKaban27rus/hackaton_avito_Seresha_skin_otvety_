@@ -75,15 +75,15 @@ func TestOpenRouterClassifiesBlocker(t *testing.T) {
 	o := fakeRouter(t, func(p map[string]any) (int, any) {
 		return 200, toolReply("classify_request", map[string]string{"intent": "blocker"})
 	})
-	if got, err := o.Classify(context.Background(), "Не могу запустить", true, nil); err != nil || got != IntentBlocker {
-		t.Fatalf("%s %v", got, err)
+	if got, err := o.Classify(context.Background(), "Не могу запустить", true, nil, nil); err != nil || got.Intent != IntentBlocker {
+		t.Fatalf("%+v %v", got, err)
 	}
 }
 
 func TestOpenRouterErrorKinds(t *testing.T) {
 	for status, want := range map[int]error{401: ErrModelAuth, 403: ErrModelAuth, 402: ErrModelAuth, 429: ErrModelBusy} {
 		o := fakeRouter(t, func(map[string]any) (int, any) { return status, map[string]string{"error": "x"} })
-		if _, err := o.Classify(context.Background(), "x", false, nil); !errors.Is(err, want) || !errors.Is(err, ErrModel) {
+		if _, err := o.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, want) || !errors.Is(err, ErrModel) {
 			t.Errorf("%d: %v", status, err)
 		}
 	}
@@ -92,7 +92,7 @@ func TestOpenRouterErrorKinds(t *testing.T) {
 		return 200, toolReply("classify_request", map[string]string{"intent": "other"})
 	})
 	slow.Client.Timeout = 50 * time.Millisecond
-	if _, err := slow.Classify(context.Background(), "x", false, nil); !errors.Is(err, ErrModelTimeout) {
+	if _, err := slow.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, ErrModelTimeout) {
 		t.Errorf("timeout: %v", err)
 	}
 }

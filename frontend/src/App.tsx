@@ -11,6 +11,7 @@ import {
   NETWORK_ERROR,
   profileLabel,
   type State,
+  TURN_LABELS,
 } from './api';
 
 const STARTER_REQUEST = 'Подбери мне стартовую задачу';
@@ -67,7 +68,7 @@ function internItems(state: State): Item[] {
             author="AI-buddy"
             text={turn.answer}
             bot
-            label={turn.mode === 'fixture' ? 'Тестовый ответ' : undefined}
+            label={TURN_LABELS[turn.mode]}
           />
         </>
       ),

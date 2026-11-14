@@ -56,3 +56,57 @@ func TestInstructionAndRules(t *testing.T) {
 		t.Error("no match")
 	}
 }
+
+func TestMatchFAQ(t *testing.T) {
+	entries := []FAQ{{ID: "standup", Match: []string{"Стендап"}}, {ID: "schedule", Match: []string{"график", "стендап"}}}
+	if f, ok := MatchFAQ(entries, "Во сколько СТЕНДАП?"); !ok || f.ID != "standup" {
+		t.Errorf("case-insensitive, first entry wins: %+v", f)
+	}
+	if f, ok := MatchFAQ(entries, "Какой график?"); !ok || f.ID != "schedule" {
+		t.Errorf("any keyword: %+v", f)
+	}
+	if _, ok := MatchFAQ(entries, "С чего начать?"); ok {
+		t.Error("no match")
+	}
+	if _, ok := MatchFAQ(nil, "стендап"); ok {
+		t.Error("empty base")
+	}
+}
+
+func TestWordMatchesToleratesTyposButNotOtherWords(t *testing.T) {
+	for _, c := range []struct {
+		word, keyword string
+		want          bool
+	}{
+		{"реквесты", "реквест", true},   // other ending
+		{"рекуест", "реквест", true},    // wrong letter
+		{"отугл", "отгул", true},        // swapped letters
+		{"отпгул", "отгул", true},       // extra letter
+		{"больнчный", "больничн", true}, // missing letter in a long keyword
+		{"документацыя", "документаци", true},
+		{"стендах", "стендап", false}, // another word, not a typo
+		{"стенда", "стендап", false},  // too short to be a typo
+		{"графин", "график", false},
+		{"про", "пр", false}, // short keywords are whole words
+		{"пр", "пр", true},
+		{"цел", "цели", false},
+		{"офисе", "офис", true},
+		{"оффис", "офис", false}, // no typos in 4-letter keywords
+	} {
+		if got := wordMatches([]rune(c.word), []rune(c.keyword)); got != c.want {
+			t.Errorf("%s ~ %s = %v", c.word, c.keyword, got)
+		}
+	}
+	if !keywordMatches(splitWords("Встреча с моим РУКОВОДИТЕЛЕМ"), "встреч+руковод") {
+		t.Error("parts in any place")
+	}
+	if keywordMatches(splitWords("встреча"), "встреч+руковод") || keywordMatches(splitWords("что угодно"), "+") {
+		t.Error("every part is required")
+	}
+	if !keywordMatches(splitWords("пул реквест"), "пулреквест") || !keywordMatches(splitWords("пулреквест"), "пул реквест") {
+		t.Error("glued and split words")
+	}
+	if typoDistance([]rune("ab"), []rune("ba")) != 1 || typoDistance([]rune(""), []rune("abc")) != 3 {
+		t.Error("distance")
+	}
+}

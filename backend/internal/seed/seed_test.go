@@ -38,6 +38,23 @@ func TestLoadKeepsProfileOrderAndTicketFields(t *testing.T) {
 	}
 }
 
+func TestFAQHasTenOrMoreCompleteEntries(t *testing.T) {
+	d, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.FAQ) < 10 {
+		t.Fatalf("faq has %d entries, want at least 10", len(d.FAQ))
+	}
+	seen := map[string]bool{}
+	for _, f := range d.FAQ {
+		if f.ID == "" || seen[f.ID] || f.Team != "Поиск" || f.Topic == "" || f.Question == "" || f.Answer == "" || len(f.Match) == 0 {
+			t.Errorf("incomplete or duplicate entry %+v", f)
+		}
+		seen[f.ID] = true
+	}
+}
+
 func TestParseRejectsBrokenData(t *testing.T) {
 	for _, raw := range []string{`{`, `{"profiles": []}`, `{"profiles": {"a": 1}}`} {
 		if _, err := parse([]byte(raw)); err == nil {

@@ -38,6 +38,17 @@ describe('AI-buddy в демо Slack', () => {
     expect(screen.queryByRole('button', { name: 'Подбери мне стартовую задачу' })).not.toBeInTheDocument();
   });
 
+  it('marks answers from the FAQ base', async () => {
+    fakeApi({ session: 'intern_01' });
+    const user = renderApp();
+    await screen.findByText(/Напиши AI-buddy/);
+    await user.type(messageBox(), 'Как взять отгул?');
+    await user.click(screen.getByRole('button', { name: 'Отправить' }));
+    expect(await screen.findByText(/минимум за 3 рабочих дня/)).toBeInTheDocument();
+    expect(screen.getByText('Из базы частых вопросов')).toBeInTheDocument();
+    expect(screen.queryByText('Тестовый ответ')).not.toBeInTheDocument();
+  });
+
   it('keeps the text after an error and retries with the same request ID', async () => {
     const server = fakeApi({ session: 'intern_01' });
     const user = renderApp();

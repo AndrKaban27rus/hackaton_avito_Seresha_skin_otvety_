@@ -81,11 +81,19 @@ func AsksForHuman(message string) bool {
 func MatchFix(fixes []Fix, text string) (Fix, bool) {
 	text = strings.ToLower(text)
 	for _, f := range fixes {
-		for _, m := range f.Match {
-			if strings.Contains(text, strings.ToLower(m)) {
-				return f, true
-			}
+		if mentions(text, f.Match) {
+			return f, true
 		}
 	}
 	return Fix{}, false
+}
+
+// mentions reports whether the lowercased text contains any of the keywords.
+func mentions(text string, keywords []string) bool {
+	for _, k := range keywords {
+		if strings.Contains(text, strings.ToLower(k)) {
+			return true
+		}
+	}
+	return false
 }

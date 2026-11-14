@@ -139,6 +139,12 @@ export const EVENT_LABELS: Record<State['events'][number]['kind'], string> = {
   blocker: 'Блокер',
 };
 
+/** Where a reply came from: the rules without a model or the FAQ base approved by the lead. */
+export const TURN_LABELS: Partial<Record<string, string>> = {
+  fixture: 'Тестовый ответ',
+  faq: 'Из базы частых вопросов',
+};
+
 const ROLE_LABELS: Record<Profile['role'], string> = { intern: 'Стажёр', lead: 'Руководитель', mentor: 'Наставник' };
 
 /** Splits text into plain parts and links to synthetic demo pages. */

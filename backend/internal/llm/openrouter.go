@@ -187,26 +187,59 @@ const classifyPrompt = "Определи намерение стажёра по 
 	"task_question — вопрос о текущем назначении, его содержании или первом шаге, " +
 	"например «Какую задачу мне уже назначили?» или «С чего начать?», если есть назначение. " +
 	"other — приветствие, отказ, запрос на другое действие, общий вопрос о процессе " +
-	"или сообщение, из которого неясно, что стажёр просит подобрать задачу. " +
-	"Верни только намерение через функцию."
+	"или сообщение, из которого неясно, что стажёр просит подобрать задачу. "
 
-func (o *OpenRouter) Classify(ctx context.Context, msg string, hasAssignment bool, history []Turn) (Intent, error) {
+const classifyFAQPrompt = "faq — общий вопрос о работе в команде, а не о текущей задаче: встречи, цели, доступы, " +
+	"график, болезнь, отгулы, код-ревью, документация. Такой вопрос — faq, а не other. Сравни его по смыслу с вопросами " +
+	"из списка faq и верни id подходящего в faq_id; если подходящего нет, верни faq_id = none. " +
+	"Вопрос о статусе, сроке или первом шаге текущей задачи — task_question, а сообщение о том, что работа стоит, — blocker, " +
+	"даже если тема похожа на вопрос из faq. Для всех намерений, кроме faq, верни faq_id = none. "
+
+// faqNone is the faq_id for «no entry fits» and for intents other than faq.
+const faqNone = "none"
+
+func (o *OpenRouter) Classify(ctx context.Context, msg string, hasAssignment bool, faq []domain.FAQ, history []Turn) (Classification, error) {
 	intents := []string{string(IntentPickTask), string(IntentTaskQuestion), string(IntentOther), string(IntentBlocker)}
+	input := map[string]any{"message": msg, "has_assignment": hasAssignment, "previous_turns": historyJSON(history)}
+	fields := map[string]any{}
+	prompt := classifyPrompt + "Верни только намерение через функцию."
+	ids := []string{}
+	if len(faq) > 0 {
+		intents = append(intents, string(IntentFAQ))
+		questions := []map[string]string{}
+		for _, f := range faq {
+			ids = append(ids, f.ID)
+			questions = append(questions, map[string]string{"id": f.ID, "question": f.Question})
+		}
+		// Only the questions go to the model: answers stay in the database and reach the intern as is.
+		input["faq"] = questions
+		fields["faq_id"] = map[string]any{"type": "string", "enum": append(slices.Clone(ids), faqNone)}
+		prompt = classifyPrompt + classifyFAQPrompt + "Верни намерение и faq_id через функцию."
+	}
+	fields["intent"] = map[string]any{"type": "string", "enum": intents}
 	var out struct {
 		Intent string `json:"intent"`
+		FAQID  string `json:"faq_id"`
 	}
-	err := o.action(ctx, "classify_request", "Вернуть намерение стажёра.",
-		map[string]any{"intent": map[string]any{"type": "string", "enum": intents}},
-		[]message{{"system", classifyPrompt}, {"user", mustJSON(map[string]any{
-			"message": msg, "has_assignment": hasAssignment, "previous_turns": historyJSON(history),
-		})}}, budgetClassify, &out)
+	err := o.action(ctx, "classify_request", "Вернуть намерение стажёра.", fields,
+		[]message{{"system", prompt}, {"user", mustJSON(input)}}, budgetClassify, &out)
 	if err != nil {
-		return "", err
+		return Classification{}, err
 	}
 	if !slices.Contains(intents, out.Intent) {
-		return "", fmt.Errorf("%w: unknown intent", ErrModel)
+		return Classification{}, fmt.Errorf("%w: unknown intent", ErrModel)
 	}
-	return Intent(out.Intent), nil
+	c := Classification{Intent: Intent(out.Intent)}
+	if len(faq) == 0 {
+		return c, nil
+	}
+	if out.FAQID != faqNone && !slices.Contains(ids, out.FAQID) {
+		return Classification{}, fmt.Errorf("%w: unknown faq id", ErrModel)
+	}
+	if c.Intent == IntentFAQ && out.FAQID != faqNone {
+		c.FAQID = out.FAQID
+	}
+	return c, nil
 }
 
 const selectPrompt = "Выбери одну стартовую задачу из candidates, опираясь на запрос, грейд и цель " +

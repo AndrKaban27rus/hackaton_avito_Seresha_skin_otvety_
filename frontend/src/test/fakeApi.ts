@@ -121,7 +121,12 @@ export function fakeApi(options: { session?: string } = {}) {
         answer = 'Назначена BACK-112 — «Проверить кэширование».\nПервый шаг: замерь p95.';
         reports = [...reports, { message: 'Отчёт: назначена BACK-112', created_at: at() }];
       }
-      chat.push({ question: body!.message, answer, mode: 'fixture', created_at: at() });
+      let mode = 'fixture';
+      if (body!.message.includes('отгул')) {
+        answer = 'Отгул согласуй с руководителем минимум за 3 рабочих дня.';
+        mode = 'faq';
+      }
+      chat.push({ question: body!.message, answer, mode, created_at: at() });
       return { status: 200, body: state() };
     }
     if (path === '/api/task/status') {

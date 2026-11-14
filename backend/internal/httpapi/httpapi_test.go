@@ -55,11 +55,13 @@ type scripted struct {
 	llm.Fixture
 	mode     string
 	classify func(string, bool, []llm.Turn) (llm.Intent, error)
-	sel      func(string, []domain.Ticket, domain.Profile) (llm.Selection, error)
-	answer   func(string, llm.Assignment, []llm.Turn) (string, error)
-	assess   func(llm.BlockerCase) (llm.Assessment, error)
-	mu       sync.Mutex
-	selects  int
+	// classifyFAQ overrides the whole classification and sees the FAQ entries passed to the model.
+	classifyFAQ func(string, []domain.FAQ) (llm.Classification, error)
+	sel         func(string, []domain.Ticket, domain.Profile) (llm.Selection, error)
+	answer      func(string, llm.Assignment, []llm.Turn) (string, error)
+	assess      func(llm.BlockerCase) (llm.Assessment, error)
+	mu          sync.Mutex
+	selects     int
 }
 
 func (s *scripted) Mode() string {
@@ -69,11 +71,15 @@ func (s *scripted) Mode() string {
 	return llm.ModeFixture
 }
 
-func (s *scripted) Classify(ctx context.Context, m string, has bool, h []llm.Turn) (llm.Intent, error) {
-	if s.classify != nil {
-		return s.classify(m, has, h)
+func (s *scripted) Classify(ctx context.Context, m string, has bool, faq []domain.FAQ, h []llm.Turn) (llm.Classification, error) {
+	if s.classifyFAQ != nil {
+		return s.classifyFAQ(m, faq)
 	}
-	return s.Fixture.Classify(ctx, m, has, h)
+	if s.classify != nil {
+		intent, err := s.classify(m, has, h)
+		return llm.Classification{Intent: intent}, err
+	}
+	return s.Fixture.Classify(ctx, m, has, faq, h)
 }
 
 func (s *scripted) Select(ctx context.Context, q string, c []domain.Ticket, p domain.Profile, g string) (llm.Selection, error) {

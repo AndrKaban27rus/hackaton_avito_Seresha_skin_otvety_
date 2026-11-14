@@ -17,10 +17,19 @@ const (
 	IntentTaskQuestion Intent = "task_question"
 	IntentOther        Intent = "other"
 	IntentBlocker      Intent = "blocker"
+	// IntentFAQ is a general question about work in the team, answered from the FAQ base.
+	IntentFAQ Intent = "faq"
 
 	ModeFixture    = "fixture"
 	ModeOpenRouter = "openrouter"
 )
+
+// Classification is the intent of a message. FAQID is set only for IntentFAQ
+// and only to an ID from the entries the caller passed; empty means no entry fits.
+type Classification struct {
+	Intent Intent
+	FAQID  string
+}
 
 // Turn is one stored question and answer, oldest first.
 type Turn struct {
@@ -69,9 +78,10 @@ type Assessment struct {
 }
 
 // Model chooses intent, picks among permitted tickets and answers about the current one.
+// Classify also picks the matching FAQ entry, so a frequent question costs one model call.
 type Model interface {
 	Mode() string
-	Classify(ctx context.Context, message string, hasAssignment bool, history []Turn) (Intent, error)
+	Classify(ctx context.Context, message string, hasAssignment bool, faq []domain.FAQ, history []Turn) (Classification, error)
 	Select(ctx context.Context, question string, candidates []domain.Ticket, p domain.Profile, goal string) (Selection, error)
 	Answer(ctx context.Context, question string, a Assignment, history []Turn) (string, error)
 	AssessBlocker(ctx context.Context, c BlockerCase) (Assessment, error)
@@ -91,17 +101,21 @@ type Fixture struct{}
 
 func (Fixture) Mode() string { return ModeFixture }
 
-func (Fixture) Classify(_ context.Context, message string, hasAssignment bool, _ []Turn) (Intent, error) {
+// Classify applies the rules in order: pick a task, a blocker, an FAQ keyword, a task question.
+func (Fixture) Classify(_ context.Context, message string, hasAssignment bool, faq []domain.FAQ, _ []Turn) (Classification, error) {
 	switch {
 	case domain.WantsTicket(message):
-		return IntentPickTask, nil
+		return Classification{Intent: IntentPickTask}, nil
 	case hasAssignment && domain.ReportsBlocker(message):
-		return IntentBlocker, nil
-	case hasAssignment:
-		return IntentTaskQuestion, nil
-	default:
-		return IntentOther, nil
+		return Classification{Intent: IntentBlocker}, nil
 	}
+	if f, ok := domain.MatchFAQ(faq, message); ok {
+		return Classification{Intent: IntentFAQ, FAQID: f.ID}, nil
+	}
+	if hasAssignment {
+		return Classification{Intent: IntentTaskQuestion}, nil
+	}
+	return Classification{Intent: IntentOther}, nil
 }
 
 func (Fixture) Select(_ context.Context, _ string, candidates []domain.Ticket, _ domain.Profile, _ string) (Selection, error) {

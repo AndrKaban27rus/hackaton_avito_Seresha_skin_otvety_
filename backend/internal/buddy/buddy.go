@@ -40,6 +40,12 @@ const (
 
 	reportNone  = "Подходящая задача не найдена: среди открытых задач нет стартовых для этого грейда и допусков."
 	reportTaken = "Подходящая задача не найдена: все стартовые задачи, доступные стажёру, уже назначены другим."
+
+	// FAQSource closes every answer taken from the FAQ base.
+	FAQSource = "Ответ из базы частых вопросов команды (тестовые данные)."
+	MsgNoFAQ  = "В базе частых вопросов команды нет ответа на этот вопрос. Спроси руководителя или наставника."
+	// ModeFAQ marks a reply copied from the FAQ base: the model only chose the entry.
+	ModeFAQ = "faq"
 )
 
 var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
@@ -308,6 +314,7 @@ type snapshot struct {
 	today      domain.Day
 	blocker    *store.Blocker
 	docs       []domain.Doc
+	faq        []domain.FAQ
 	done       bool
 }
 
@@ -326,6 +333,10 @@ func (s *Service) read(ctx context.Context, user, requestID, question string) (s
 			return err
 		}
 		if snap.version, err = q.ChatVersion(user); err != nil {
+			return err
+		}
+		// Only the intern's team questions reach the model and the rules.
+		if snap.faq, err = q.FAQ(p.Team); err != nil {
 			return err
 		}
 		a, err := q.Assignment(user)
@@ -403,13 +414,14 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 	restricted := snap.assignment != nil && snap.assignment.Status == StatusRestricted
 	// A clarifying blocker means the bot asked «what stops you?»: this message is the answer.
 	clarifying := !restricted && snap.blocker != nil && snap.blocker.Status == store.BlockerClarifying
-	var intent llm.Intent
+	var class llm.Classification
 	if !restricted && !clarifying {
-		intent, err = s.model.Classify(ctx, question, snap.assignment != nil, snap.history)
+		class, err = s.model.Classify(ctx, question, snap.assignment != nil, snap.faq, snap.history)
 		if err != nil {
 			return modelProblem(err, "Не удалось определить, что нужно сделать. Повторите сообщение.")
 		}
 	}
+	intent := class.Intent
 	// With a blocker already at the mentor, a model may read any question as the same blocker
 	// from history. Answer about the task unless the message itself names an obstacle.
 	if intent == llm.IntentBlocker && snap.blocker != nil && !domain.ReportsBlocker(question) {
@@ -441,6 +453,9 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 		}
 		plan.resolve, plan.answer = true, question
 		mode = s.model.Mode()
+	case intent == llm.IntentFAQ:
+		// No report and no help request: the lead is not disturbed by frequent questions.
+		reply, mode = faqReply(snap.faq, class.FAQID)
 	case snap.assignment != nil && intent == llm.IntentBlocker && snap.blocker != nil:
 		reply = openBlockerReply(snap.blocker)
 	case snap.assignment != nil && intent == llm.IntentBlocker:
@@ -469,9 +484,10 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 	case intent == llm.IntentPickTask:
 		pickEmpty = true
 	case snap.assignment != nil:
-		reply = "Могу помочь с текущей задачей. Например, спроси, с чего начать."
+		reply = "Могу помочь с текущей задачей. Например, спроси, с чего начать." + faqTopics(snap.faq, "Ещё отвечаю на частые вопросы")
 	default:
-		reply = "Могу подобрать стартовую задачу в Jira. Хочешь взять что-нибудь в работу?"
+		reply = "Могу подобрать стартовую задачу в Jira. Хочешь взять что-нибудь в работу?" +
+			faqTopics(snap.faq, "Ещё отвечаю на частые вопросы")
 	}
 	if s.AfterModel != nil {
 		s.AfterModel()
@@ -615,6 +631,29 @@ func (s *Service) sendReport(q *store.Q, intern domain.Profile, outcome, result 
 	}
 	heading := fmt.Sprintf("%s · стажёр %s · команда «%s»", intern.Name, intern.Grade, intern.Team)
 	return q.InsertReport(lead.ID, intern.ID, outcome, heading+"\n"+result)
+}
+
+// faqReply returns the approved answer as is, or says honestly that the base has none.
+func faqReply(entries []domain.FAQ, id string) (string, string) {
+	i := slices.IndexFunc(entries, func(f domain.FAQ) bool { return f.ID == id })
+	if id == "" || i < 0 {
+		return MsgNoFAQ + faqTopics(entries, "В базе есть ответы на темы"), "system"
+	}
+	return entries[i].Answer + "\n" + FAQSource, ModeFAQ
+}
+
+// faqTopics lists what the FAQ base answers, so the intern knows what to ask.
+func faqTopics(entries []domain.FAQ, lead string) string {
+	var topics []string
+	for _, f := range entries {
+		if f.Topic != "" {
+			topics = append(topics, f.Topic)
+		}
+	}
+	if len(topics) == 0 {
+		return ""
+	}
+	return "\n" + lead + ": " + strings.Join(topics, ", ") + "."
 }
 
 func sameBlocker(a, b *store.Blocker) bool {

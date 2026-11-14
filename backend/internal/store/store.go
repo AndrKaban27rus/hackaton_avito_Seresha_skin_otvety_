@@ -70,6 +70,11 @@ func (s *Store) Migrate(ctx context.Context, data seed.Data) error {
 				return err
 			}
 		}
+		for i, f := range data.FAQ {
+			if err := q.upsertFAQ(f, i); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }

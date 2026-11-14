@@ -145,3 +145,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS blockers_one_active ON blockers (intern, ticke
 ALTER TABLE bot_events DROP CONSTRAINT IF EXISTS bot_events_kind_check;
 ALTER TABLE bot_events ADD CONSTRAINT bot_events_kind_check
   CHECK (kind IN ('status', 'due_soon', 'overdue', 'blocker'));
+
+-- Stage 4: frequent intern questions with answers approved by the team lead.
+-- The bot replies with the stored answer as is; keywords serve for the mode without a model.
+CREATE TABLE IF NOT EXISTS faq (
+  id TEXT PRIMARY KEY,
+  team TEXT NOT NULL,
+  question TEXT NOT NULL CHECK (question <> ''),
+  answer TEXT NOT NULL CHECK (answer <> ''),
+  keywords TEXT[] NOT NULL DEFAULT '{}',
+  sort_order INT NOT NULL
+);
+-- Short topic the bot lists when it did not understand a question.
+ALTER TABLE faq ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';

@@ -21,11 +21,11 @@ func TestFixture(t *testing.T) {
 		t.Fatal("mode")
 	}
 	for msg, want := range map[string]Intent{"Подбери задачу": IntentPickTask, "Привет": IntentOther} {
-		if got, _ := f.Classify(ctx, msg, false, nil); got != want {
-			t.Errorf("%q -> %s", msg, got)
+		if got, _ := f.Classify(ctx, msg, false, nil, nil); got.Intent != want {
+			t.Errorf("%q -> %+v", msg, got)
 		}
 	}
-	if got, _ := f.Classify(ctx, "С чего начать?", true, nil); got != IntentTaskQuestion {
+	if got, _ := f.Classify(ctx, "С чего начать?", true, nil, nil); got.Intent != IntentTaskQuestion {
 		t.Error("question with assignment")
 	}
 	sel, err := f.Select(ctx, "", []domain.Ticket{{ID: "A", OKRPriority: 1}, {ID: "B", OKRPriority: 2, DemoFirstStep: "s"}}, domain.Profile{}, "")
@@ -85,9 +85,9 @@ func TestOpenRouterClassify(t *testing.T) {
 		seen = p
 		return 200, toolReply("classify_request", map[string]string{"intent": "pick_task"})
 	})
-	got, err := o.Classify(context.Background(), "Есть что-нибудь?", false, []Turn{{"Привет", "Здравствуй"}})
-	if err != nil || got != IntentPickTask {
-		t.Fatalf("%s %v", got, err)
+	got, err := o.Classify(context.Background(), "Есть что-нибудь?", false, nil, []Turn{{"Привет", "Здравствуй"}})
+	if err != nil || got.Intent != IntentPickTask {
+		t.Fatalf("%+v %v", got, err)
 	}
 	if seen["model"] != "test-model" || seen["models"] != nil {
 		t.Error("model name is sent")
@@ -127,7 +127,7 @@ func TestOpenRouterRejectsInvalidAnswers(t *testing.T) {
 	}
 	for name, handle := range cases {
 		o := fakeRouter(t, handle)
-		if _, err := o.Classify(context.Background(), "x", false, nil); !errors.Is(err, ErrModel) {
+		if _, err := o.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, ErrModel) {
 			t.Errorf("%s: err = %v", name, err)
 		}
 	}
@@ -135,7 +135,7 @@ func TestOpenRouterRejectsInvalidAnswers(t *testing.T) {
 
 func TestOpenRouterNetworkFailureAndTimeout(t *testing.T) {
 	o := NewOpenRouter("http://127.0.0.1:1", "key", "")
-	if _, err := o.Classify(context.Background(), "x", false, nil); !errors.Is(err, ErrModel) {
+	if _, err := o.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, ErrModel) {
 		t.Error("network failure is a model error")
 	}
 	slow := fakeRouter(t, func(map[string]any) (int, any) {
@@ -143,11 +143,11 @@ func TestOpenRouterNetworkFailureAndTimeout(t *testing.T) {
 		return 200, toolReply("classify_request", map[string]string{"intent": "other"})
 	})
 	slow.Client.Timeout = 50 * time.Millisecond
-	if _, err := slow.Classify(context.Background(), "x", false, nil); !errors.Is(err, ErrModel) {
+	if _, err := slow.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, ErrModel) {
 		t.Error("timeout is a model error")
 	}
 	bad := NewOpenRouter("http://[::1", "key", "")
-	if _, err := bad.Classify(context.Background(), "x", false, nil); !errors.Is(err, ErrModel) {
+	if _, err := bad.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, ErrModel) {
 		t.Error("bad URL is a model error")
 	}
 }
@@ -248,11 +248,90 @@ func TestOpenRouterSendsFallbackModels(t *testing.T) {
 		return 200, toolReply("classify_request", map[string]string{"intent": "other"})
 	})
 	o.Models = NewOpenRouter("", "k", " first:free , second:free ,").Models
-	if _, err := o.Classify(context.Background(), "x", false, nil); err != nil {
+	if _, err := o.Classify(context.Background(), "x", false, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	models, _ := seen["models"].([]any)
 	if seen["model"] != "first:free" || len(models) != 2 || models[1] != "second:free" {
 		t.Errorf("payload model=%v models=%v", seen["model"], seen["models"])
+	}
+}
+
+var faqBase = []domain.FAQ{
+	{ID: "vacation", Question: "Как взять отгул?", Answer: "Согласуй с руководителем.", Match: []string{"отгул"}},
+	{ID: "code_review", Question: "Как оформить pull request?", Answer: "Ветка от master.", Match: []string{"pull request", "ревьюер"}},
+}
+
+func TestFixtureClassifiesFAQ(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		msg  string
+		has  bool
+		want Classification
+	}{
+		{"Как взять отгул?", false, Classification{Intent: IntentFAQ, FAQID: "vacation"}},
+		{"Кого назначить ревьюером?", true, Classification{Intent: IntentFAQ, FAQID: "code_review"}},
+		{"Как отправить задачу на ревью?", true, Classification{Intent: IntentTaskQuestion}},
+		{"Не могу открыть pull request", true, Classification{Intent: IntentBlocker}},
+		{"Не могу открыть pull request", false, Classification{Intent: IntentFAQ, FAQID: "code_review"}},
+		{"Дай задачу, а потом расскажи про отгул", false, Classification{Intent: IntentPickTask}},
+		{"Привет", false, Classification{Intent: IntentOther}},
+	} {
+		if got, _ := (Fixture{}).Classify(ctx, c.msg, c.has, faqBase, nil); got != c.want {
+			t.Errorf("%q (assignment %v) -> %+v", c.msg, c.has, got)
+		}
+	}
+}
+
+func TestOpenRouterClassifiesFAQ(t *testing.T) {
+	answer := map[string]string{"intent": "faq", "faq_id": "vacation"}
+	o := fakeRouter(t, func(p map[string]any) (int, any) {
+		msgs := p["messages"].([]any)
+		system := msgs[0].(map[string]any)["content"].(string)
+		user := msgs[1].(map[string]any)["content"].(string)
+		if !strings.Contains(user, `{"id":"vacation","question":"Как взять отгул?"}`) || strings.Contains(user, "Согласуй") {
+			t.Errorf("only questions go to the model: %s", user)
+		}
+		if !strings.Contains(system, "faq_id = none") {
+			t.Errorf("system = %s", system)
+		}
+		fn := p["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)
+		props := fn["parameters"].(map[string]any)["properties"].(map[string]any)
+		if ids := props["faq_id"].(map[string]any)["enum"].([]any); len(ids) != 3 || ids[2] != "none" {
+			t.Errorf("faq ids = %v", ids)
+		}
+		return 200, toolReply("classify_request", answer)
+	})
+	ctx := context.Background()
+	if got, err := o.Classify(ctx, "Можно отгул?", false, faqBase, nil); err != nil || got != (Classification{Intent: IntentFAQ, FAQID: "vacation"}) {
+		t.Fatalf("%+v %v", got, err)
+	}
+	answer = map[string]string{"intent": "faq", "faq_id": "none"}
+	if got, err := o.Classify(ctx, "Какой дресс-код?", false, faqBase, nil); err != nil || got != (Classification{Intent: IntentFAQ}) {
+		t.Errorf("no entry fits: %+v %v", got, err)
+	}
+	answer = map[string]string{"intent": "task_question", "faq_id": "vacation"}
+	if got, err := o.Classify(ctx, "С чего начать?", true, faqBase, nil); err != nil || got != (Classification{Intent: IntentTaskQuestion}) {
+		t.Errorf("faq_id is dropped for other intents: %+v %v", got, err)
+	}
+	for _, bad := range []map[string]string{{"intent": "faq", "faq_id": "salary"}, {"intent": "faq"}} {
+		answer = bad
+		if _, err := o.Classify(ctx, "x", false, faqBase, nil); !errors.Is(err, ErrModel) {
+			t.Errorf("%v must be rejected", bad)
+		}
+	}
+}
+
+func TestOpenRouterClassifyWithoutFAQKeepsOneField(t *testing.T) {
+	o := fakeRouter(t, func(p map[string]any) (int, any) {
+		fn := p["tools"].([]any)[0].(map[string]any)["function"].(map[string]any)
+		props := fn["parameters"].(map[string]any)["properties"].(map[string]any)
+		if _, ok := props["faq_id"]; ok || len(props) != 1 {
+			t.Errorf("properties = %v", props)
+		}
+		return 200, toolReply("classify_request", map[string]string{"intent": "faq"})
+	})
+	if _, err := o.Classify(context.Background(), "Как взять отгул?", false, nil, nil); !errors.Is(err, ErrModel) {
+		t.Error("faq is not a valid intent without the base")
 	}
 }

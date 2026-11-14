@@ -30,6 +30,7 @@ type Data struct {
 	TeamGoal string
 	Channels []Channel
 	Docs     []domain.Doc
+	FAQ      []domain.FAQ
 }
 
 type profileJSON struct {
@@ -64,6 +65,7 @@ type fileJSON struct {
 	TeamGoal string          `json:"team_goal"`
 	Channels []Channel       `json:"channels"`
 	Docs     []domain.Doc    `json:"knowledge_base"`
+	FAQ      []domain.FAQ    `json:"faq"`
 }
 
 // orderedProfiles keeps the order of the JSON object so the profile picker is stable.
@@ -113,7 +115,7 @@ func parse(b []byte) (Data, error) {
 	if err := json.Unmarshal(b, &f); err != nil {
 		return Data{}, fmt.Errorf("demo data: %w", err)
 	}
-	d := Data{Profiles: f.Profiles, TeamGoal: f.TeamGoal, Channels: f.Channels, Docs: f.Docs}
+	d := Data{Profiles: f.Profiles, TeamGoal: f.TeamGoal, Channels: f.Channels, Docs: f.Docs, FAQ: f.FAQ}
 	for _, t := range f.Tickets {
 		labels := t.Labels
 		if labels == nil {
