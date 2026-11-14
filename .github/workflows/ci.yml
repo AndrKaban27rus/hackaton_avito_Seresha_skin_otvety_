@@ -1,7 +1,6 @@
 name: ci
 permissions:
   contents: read
-  packages: write
 on:
   push:
     branches: [main, master]
@@ -10,51 +9,46 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: {POSTGRES_DB: buddy_test, POSTGRES_USER: buddy, POSTGRES_PASSWORD: buddy}
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U buddy" --health-interval 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://buddy:buddy@localhost:5432/buddy_test?sslmode=disable
+    defaults:
+      run: {working-directory: backend}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: {go-version-file: backend/go.mod}
-      - run: test -z "$(gofmt -l $(find . -name '*.go'))"
-        working-directory: backend
+      - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
-        working-directory: backend
-      - run: go build ./...
-        working-directory: backend
+      - run: go test -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...
+      - run: go tool cover -func=coverage.out | tail -1
+      - uses: actions/upload-artifact@v4
+        with: {name: backend-coverage, path: backend/coverage.out}
   frontend:
     runs-on: ubuntu-latest
+    defaults:
+      run: {working-directory: frontend}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: 22}
       - run: npm ci
-        working-directory: frontend
       - run: npm run test:coverage
-        working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: always()
-        with:
-          name: frontend-coverage
-          path: frontend/coverage
+        with: {name: frontend-coverage, path: frontend/coverage}
       - run: npm run build
-        working-directory: frontend
-  publish:
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')
-    needs: [backend, frontend]
+  python-reference:
     runs-on: ubuntu-latest
+    defaults:
+      run: {working-directory: Demo}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: true
-          tags: ghcr.io/${{ github.repository }}/api:${{ github.sha }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: true
-          tags: ghcr.io/${{ github.repository }}/web:${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -B -m unittest discover -s tests -v

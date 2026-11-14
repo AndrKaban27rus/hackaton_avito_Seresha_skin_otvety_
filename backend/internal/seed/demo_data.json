@@ -1,0 +1,308 @@
+{
+  "profiles": {
+    "intern_01": {
+      "role": "intern",
+      "name": "Алексей Сергеевич Ким",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": [
+        "search_dev"
+      ],
+      "lead_id": "lead_01",
+      "mentor_id": "mentor_01"
+    },
+    "lead_01": {
+      "role": "lead",
+      "name": "Мария Андреевна Волкова",
+      "team": "Поиск",
+      "grade": null
+    },
+    "mentor_01": {
+      "role": "mentor",
+      "name": "Олег Павлович Смирнов",
+      "team": "Поиск",
+      "grade": "E3",
+      "grants": [
+        "search_dev",
+        "search_stand"
+      ]
+    },
+    "intern_02": {
+      "role": "intern",
+      "name": "Елена Игоревна Орлова",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": [
+        "search_dev"
+      ],
+      "lead_id": "lead_01",
+      "mentor_id": "mentor_01"
+    },
+    "intern_03": {
+      "role": "intern",
+      "name": "Илья Андреевич Соколов",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": [
+        "search_dev"
+      ],
+      "lead_id": "lead_01",
+      "mentor_id": "mentor_01"
+    },
+    "intern_04": {
+      "role": "intern",
+      "name": "Дарья Николаевна Белова",
+      "team": "Поиск",
+      "grade": "E1",
+      "grants": [],
+      "lead_id": "lead_01",
+      "mentor_id": "mentor_01"
+    }
+  },
+  "tickets": [
+    {
+      "id": "BACK-104",
+      "team": "Поиск",
+      "title": "Уточнить логирование в сервисе профилей",
+      "description": "Улучшить диагностические события.",
+      "requires": [
+        "profiles_ki"
+      ],
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "confidential",
+      "grades": [
+        "E1"
+      ]
+    },
+    {
+      "id": "BACK-112",
+      "team": "Поиск",
+      "title": "Проверить кэширование фильтров поиска",
+      "description": "Сравнить p95 задержки с кэшем и без кэша на одном тестовом наборе.",
+      "requires": [
+        "search_dev"
+      ],
+      "okr_priority": 2,
+      "demo_rationale": "Задача поддерживает цель команды по ускорению поиска. Сравнение p95 на одинаковом наборе покажет, влияет ли кэш на скорость.",
+      "demo_first_step": "Открой тестовый набор запросов и замерь p95 при выключенном кэше.",
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "internal",
+      "grades": [
+        "E1"
+      ],
+      "due_days": 3
+    },
+    {
+      "id": "BACK-118",
+      "team": "Поиск",
+      "title": "Дополнить тесты фильтров поиска",
+      "description": "Добавить проверки пустого результата и сочетания фильтров.",
+      "requires": [
+        "search_dev"
+      ],
+      "okr_priority": 1,
+      "demo_rationale": "Тесты дадут команде стабильный набор запросов для будущих измерений.",
+      "demo_first_step": "Открой существующие тесты фильтров и найди фикстуру запроса без результатов.",
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "internal",
+      "grades": [
+        "E1"
+      ],
+      "due_days": 4
+    },
+    {
+      "id": "BACK-121",
+      "team": "Поиск",
+      "title": "Проверить сервис индексации",
+      "description": "Тестовая задача для проверки неизвестной классификации.",
+      "requires": [],
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "grades": [
+        "E1"
+      ]
+    },
+    {
+      "id": "BACK-130",
+      "team": "Поиск",
+      "title": "Пересмотреть схему индекса",
+      "description": "Тестовая задача для E2.",
+      "requires": [],
+      "labels": [
+        "starter"
+      ],
+      "status": "open",
+      "classification": "internal",
+      "grades": [
+        "E2"
+      ]
+    }
+  ],
+  "team_goal": "Ускорить выдачу результатов поиска. В стартовых задачах приоритет у изменений с проверяемым результатом.",
+  "channels": [
+    {
+      "id": "general",
+      "name": "общий",
+      "messages": [
+        {
+          "author": "Мария Волкова",
+          "text": "Привет! Здесь обсуждаем новости команды «Поиск»."
+        }
+      ]
+    },
+    {
+      "id": "onboarding",
+      "name": "стажировка",
+      "messages": [
+        {
+          "author": "Мария Волкова",
+          "text": "За первой задачей обращайтесь к AI-buddy в личных сообщениях."
+        }
+      ]
+    }
+  ],
+  "knowledge_base": [
+    {
+      "id": "conf-search-p95",
+      "kind": "confluence",
+      "ticket": "BACK-112",
+      "title": "Тестовая инструкция Confluence: замер p95 фильтров поиска",
+      "requires": [
+        "search_dev"
+      ],
+      "steps": [
+        "Открой тестовый дашборд Grafana «Поиск · фильтры (test)» (/demo/grafana-search-filters), панель «p95 latency, ms».",
+        "Для обоих замеров используй один и тот же набор запросов filters-smoke-200 из этой инструкции, чтобы результаты были сравнимы.",
+        "Первый замер — флаг search.filters.cache выключен на тестовом стенде, второй — включён. Каждый замер длится 10 минут.",
+        "Приложи таблицу p95 «без кэша / с кэшем» и два скриншота панели комментарием к BACK-112 в Jira."
+      ],
+      "check": "Проверь, что флаг search.filters.cache включён и набор filters-smoke-200 тот же, что в первом замере.",
+      "fixes": [
+        {
+          "match": [
+            "доступ",
+            "403",
+            "прав",
+            "не пускает",
+            "стенд недоступ"
+          ],
+          "needs_human": true,
+          "self_step": "Пока ждёшь доступ, подготовь таблицу для результатов и проверь первый замер на дашборде.",
+          "request": "Выдай доступ search_stand к тестовому стенду поиска или запусти второй замер вместе со стажёром."
+        },
+        {
+          "match": [
+            "флаг",
+            "кэш не",
+            "кеш не"
+          ],
+          "needs_human": false,
+          "self_step": "Включи флаг search.filters.cache на странице флагов тестового стенда (/demo/stand-search-flags) и перезапусти замер с тем же набором filters-smoke-200.",
+          "request": ""
+        },
+        {
+          "match": [
+            "набор",
+            "запрос",
+            "filters-smoke"
+          ],
+          "needs_human": false,
+          "self_step": "Возьми набор filters-smoke-200 из инструкции (/demo/conf-search-p95), а не свой: тогда второй замер сравним с первым.",
+          "request": ""
+        }
+      ]
+    },
+    {
+      "id": "grafana-search-filters",
+      "kind": "grafana",
+      "ticket": "BACK-112",
+      "title": "Тестовый дашборд Grafana «Поиск · фильтры (test)»",
+      "requires": [
+        "search_dev"
+      ],
+      "lines": [
+        "Панель «p95 latency, ms» — задержка ответа фильтров поиска на тестовом стенде.",
+        "Переменная env = test, интервал — последние 15 минут.",
+        "Синтетические значения: без кэша около 180 мс, с кэшем около 95 мс."
+      ]
+    },
+    {
+      "id": "stand-search-flags",
+      "kind": "stand",
+      "ticket": "BACK-112",
+      "title": "Тестовый стенд поиска: флаги",
+      "requires": [
+        "search_dev"
+      ],
+      "lines": [
+        "search.filters.cache — выключен (переключается на тестовом стенде, на прод не влияет).",
+        "Запуск замера: «Запустить набор» → filters-smoke-200."
+      ]
+    },
+    {
+      "id": "conf-search-tests",
+      "kind": "confluence",
+      "ticket": "BACK-118",
+      "title": "Тестовая инструкция Confluence: тесты фильтров поиска",
+      "requires": [
+        "search_dev"
+      ],
+      "steps": [
+        "Открой тестовый репозиторий Bitbucket search/search-filters (/demo/bitbucket-search-filters).",
+        "Тесты фильтров лежат в tests/filters/, сочетания фильтров — в test_filters_combinations.py, фикстура пустого результата — tests/fixtures/empty_result.json.",
+        "Добавь проверки пустого результата и сочетания фильтров, запусти make test-filters.",
+        "Открой pull request в тестовом Bitbucket и приложи ссылку к BACK-118 в Jira."
+      ],
+      "check": "Проверь, что запускаешь make test-filters из корня репозитория и фикстура empty_result.json на месте.",
+      "fixes": [
+        {
+          "match": [
+            "доступ",
+            "403",
+            "прав",
+            "репозитори"
+          ],
+          "needs_human": true,
+          "self_step": "Пока ждёшь доступ, прочитай существующие тесты в инструкции и набросай список проверок.",
+          "request": "Выдай доступ на запись в тестовый репозиторий search/search-filters или открой pull request вместе со стажёром."
+        },
+        {
+          "match": [
+            "make",
+            "не запуска",
+            "падает",
+            "ошибк"
+          ],
+          "needs_human": false,
+          "self_step": "Запусти make test-filters из корня репозитория: команда сама подтянет фикстуры. Если тест падает, сравни ожидание с tests/fixtures/empty_result.json.",
+          "request": ""
+        }
+      ]
+    },
+    {
+      "id": "bitbucket-search-filters",
+      "kind": "bitbucket",
+      "ticket": "BACK-118",
+      "title": "Тестовый репозиторий Bitbucket search/search-filters",
+      "requires": [
+        "search_dev"
+      ],
+      "lines": [
+        "tests/filters/test_filters_combinations.py — сочетания фильтров.",
+        "tests/fixtures/empty_result.json — запрос без результатов.",
+        "make test-filters — запуск тестов фильтров."
+      ]
+    }
+  ]
+}

@@ -9,3 +9,6 @@
 *.tsbuildinfo
 /tmp/
 .go
+/backend/coverage.out
+/backend/coverage.html
+/backend/*.exe
