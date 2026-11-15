@@ -427,6 +427,15 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 	if intent == llm.IntentBlocker && snap.blocker != nil && !domain.ReportsBlocker(question) {
 		intent = llm.IntentTaskQuestion
 	}
+	// A model may answer «Как отправить задачу на ревью?» with the pull request FAQ entry or
+	// call it «other». With a task, questions about its status or deadline go to the task
+	// answer unless the FAQ rules recognise the phrase themselves.
+	if (intent == llm.IntentFAQ || intent == llm.IntentOther) && snap.assignment != nil && !restricted &&
+		domain.AsksAboutProgress(question) {
+		if _, ok := domain.MatchFAQ(snap.faq, question); !ok {
+			intent = llm.IntentTaskQuestion
+		}
+	}
 	if intent == llm.IntentPickTask && snap.assignment == nil {
 		if snap.candidates, err = s.candidates(ctx, snap.profile); err != nil {
 			return err
@@ -469,11 +478,17 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 		a := snap.assignment
 		reply = fmt.Sprintf("У тебя уже есть задача %s — «%s». Статус: «%s», срок — %s.\nСледующий шаг: %s",
 			a.TicketID, a.Title, a.StatusName, a.DueLabel, a.NextStep)
+	case snap.assignment != nil && intent == llm.IntentTaskQuestion && domain.AsksAboutProgress(question):
+		// Status and deadline come from Jira: a fixed answer is exact and cannot borrow
+		// an unrelated reply from the chat history.
+		reply = llm.ProgressAnswer(s.modelAssignment(snap))
 	case snap.assignment != nil && intent == llm.IntentTaskQuestion:
 		reply, err = s.model.Answer(ctx, question, s.modelAssignment(snap), snap.history)
 		if err != nil {
 			return modelProblem(err, "Не удалось получить ответ по задаче. Повторите сообщение.")
 		}
+		// Only the FAQ branch may claim the FAQ base as the source.
+		reply = strings.TrimSpace(strings.ReplaceAll(reply, FAQSource, ""))
 		mode = s.model.Mode()
 	case len(snap.candidates) > 0:
 		sel, err := s.model.Select(ctx, question, snap.candidates, snap.profile, s.data.TeamGoal)

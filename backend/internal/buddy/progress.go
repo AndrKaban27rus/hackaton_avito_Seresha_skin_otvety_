@@ -3,6 +3,8 @@ package buddy
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/hackandchange/ai-buddy/backend/internal/domain"
 	"github.com/hackandchange/ai-buddy/backend/internal/store"
@@ -17,7 +19,7 @@ var actionLabels = map[string]string{
 func nextStep(status, firstStep string) string {
 	switch status {
 	case domain.StatusAssigned:
-		return firstStep + " Когда начнёшь, нажми «Взять в работу»."
+		return sentence(firstStep) + " Когда начнёшь, нажми «Взять в работу»."
 	case domain.StatusInProgress:
 		return "Когда результат готов, приложи его к задаче в Jira и нажми «Отправить на ревью»."
 	default:
@@ -204,4 +206,14 @@ func (s *Service) Clock(ctx context.Context, action string) error {
 	}
 	_, err = s.RunReminders(ctx)
 	return err
+}
+
+// sentence ends a model-written step with a period, so the next sentence does not run into it.
+func sentence(s string) string {
+	s = strings.TrimSpace(s)
+	last, _ := utf8.DecodeLastRuneInString(s)
+	if s == "" || strings.ContainsRune(".!?…", last) {
+		return s
+	}
+	return s + "."
 }

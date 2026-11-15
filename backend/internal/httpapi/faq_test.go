@@ -94,3 +94,45 @@ func TestFAQAnswerComesFromTheDatabase(t *testing.T) {
 		t.Errorf("mode = %s, reports = %d", chat[len(chat)-1].Mode, len(e.state(lead).Notifications))
 	}
 }
+
+func TestTaskProgressQuestionWinsOverModelFAQChoice(t *testing.T) {
+	e := newEnv(t)
+	elena := e.login("intern_02")
+	e.pick(elena)
+	// The real model picked the pull request entry for a question about the task status.
+	e.model.classifyFAQ = func(string, []domain.FAQ) (llm.Classification, error) {
+		return llm.Classification{Intent: llm.IntentFAQ, FAQID: "code_review"}, nil
+	}
+	progress := e.say(elena, "Как отправить задачу на ревью?", "task-1")
+	mustContain(t, progress, "статус «Назначена»", "кнопкой «Взять в работу»")
+	mustNotContain(t, progress, buddy.FAQSource)
+	// A question the FAQ rules recognise stays a frequent question, even with «ревью» in it.
+	mustContain(t, e.say(elena, "Как оформить pull request на код-ревью?", "faq-1"), "Первым ревьюером назначь наставника", buddy.FAQSource)
+	// The model may also call it «other»: the task answer still wins.
+	e.model.classifyFAQ = func(string, []domain.FAQ) (llm.Classification, error) {
+		return llm.Classification{Intent: llm.IntentOther}, nil
+	}
+	mustContain(t, e.say(elena, "Какой у задачи срок?", "task-2"), "срок —", "кнопкой «Взять в работу»")
+	e.model.classifyFAQ = func(string, []domain.FAQ) (llm.Classification, error) {
+		return llm.Classification{Intent: llm.IntentFAQ, FAQID: "code_review"}, nil
+	}
+	// Without a task there is no task answer to prefer.
+	alexey := e.login("intern_01")
+	mustContain(t, e.say(alexey, "Как отправить задачу на ревью?", "faq-2"), buddy.FAQSource)
+}
+
+func TestModelAnswerCannotClaimFAQSource(t *testing.T) {
+	e := newEnv(t)
+	elena := e.login("intern_02")
+	e.pick(elena)
+	e.model.answer = func(string, llm.Assignment, []llm.Turn) (string, error) {
+		return "Создай ветку от master.\n" + buddy.FAQSource, nil
+	}
+	answer := e.say(elena, "С чего начать?", "q1")
+	mustContain(t, answer, "Создай ветку от master.")
+	mustNotContain(t, answer, buddy.FAQSource)
+	// A status question never reaches the model: the answer comes from Jira data.
+	progress := e.say(elena, "Как отправить задачу на ревью?", "q2")
+	mustContain(t, progress, "статус «Назначена»", "кнопкой «Взять в работу»")
+	mustNotContain(t, progress, "Создай ветку")
+}
