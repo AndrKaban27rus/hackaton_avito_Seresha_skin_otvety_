@@ -118,3 +118,24 @@ func TestProviderFailureIsRetriedOnce(t *testing.T) {
 		t.Errorf("rate limits are not repeated: err=%v calls=%d", err, calls)
 	}
 }
+
+func TestProviderReasonReachesTheErrorAndKeyIsTrimmed(t *testing.T) {
+	o := fakeRouter(t, func(map[string]any) (int, any) {
+		return 403, map[string]any{"error": map[string]any{"message": "This model is not available in your region.", "code": 403}}
+	})
+	_, err := o.Classify(context.Background(), "x", false, nil, nil)
+	if !errors.Is(err, ErrModelForbidden) || !strings.Contains(err.Error(), "not available in your region") {
+		t.Errorf("err = %v", err)
+	}
+	o = fakeRouter(t, func(map[string]any) (int, any) { return 401, "plain text refusal" })
+	if _, err := o.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, ErrModelAuth) ||
+		!strings.Contains(err.Error(), "plain text refusal") {
+		t.Errorf("err = %v", err)
+	}
+	if got := NewOpenRouter("", " \"sk-or-v1-abc\"\r\n", "").Key; got != "sk-or-v1-abc" {
+		t.Errorf("key = %q", got)
+	}
+	if providerReason(strings.NewReader("")) != "no details" || len([]rune(providerReason(strings.NewReader(strings.Repeat("я", 400))))) != 300 {
+		t.Error("reason limits")
+	}
+}

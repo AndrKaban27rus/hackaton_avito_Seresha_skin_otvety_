@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -55,6 +56,8 @@ func NewOpenRouter(baseURL, key, models string) *OpenRouter {
 	if strings.TrimSpace(models) == "" {
 		models = DefaultModel
 	}
+	// A key pasted into .env often brings spaces, a line break or quotes along.
+	key = strings.Trim(strings.TrimSpace(key), `"'`)
 	var list []string
 	for _, m := range strings.Split(models, ",") {
 		if m = strings.TrimSpace(m); m != "" {
@@ -122,16 +125,22 @@ func (o *OpenRouter) completeOnce(ctx context.Context, payload map[string]any) (
 		return reply{}, fmt.Errorf("%w: %v", ErrModel, err)
 	}
 	defer resp.Body.Close()
-	switch {
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
-		resp.StatusCode == http.StatusPaymentRequired:
-		return reply{}, fmt.Errorf("%w: %w: status %d", ErrModel, ErrModelAuth, resp.StatusCode)
-	case resp.StatusCode == http.StatusTooManyRequests:
-		return reply{}, fmt.Errorf("%w: %w", ErrModel, ErrModelBusy)
-	case resp.StatusCode >= 500:
-		return reply{}, fmt.Errorf("%w: %w: status %d", ErrModel, ErrModelUnavailable, resp.StatusCode)
-	case resp.StatusCode != http.StatusOK:
-		return reply{}, fmt.Errorf("%w: status %d", ErrModel, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		// OpenRouter explains the refusal in the body («User not found», «not available in your region»):
+		// keep it in the error so the server log shows the reason, not only the code.
+		reason := providerReason(resp.Body)
+		switch {
+		case resp.StatusCode == http.StatusForbidden:
+			return reply{}, fmt.Errorf("%w: %w: status 403: %s", ErrModel, ErrModelForbidden, reason)
+		case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusPaymentRequired:
+			return reply{}, fmt.Errorf("%w: %w: status %d: %s", ErrModel, ErrModelAuth, resp.StatusCode, reason)
+		case resp.StatusCode == http.StatusTooManyRequests:
+			return reply{}, fmt.Errorf("%w: %w: %s", ErrModel, ErrModelBusy, reason)
+		case resp.StatusCode >= 500:
+			return reply{}, fmt.Errorf("%w: %w: status %d: %s", ErrModel, ErrModelUnavailable, resp.StatusCode, reason)
+		default:
+			return reply{}, fmt.Errorf("%w: status %d: %s", ErrModel, resp.StatusCode, reason)
+		}
 	}
 	var out struct {
 		Model   string `json:"model"`
@@ -389,4 +398,25 @@ func (o *OpenRouter) AssessBlocker(ctx context.Context, c BlockerCase) (Assessme
 // plain drops bold markers: the chat shows model text as is, without Markdown.
 func plain(s string) string {
 	return strings.TrimSpace(strings.ReplaceAll(s, "**", ""))
+}
+
+// providerReason reads OpenRouter's error message, at most 300 characters.
+func providerReason(body io.Reader) string {
+	raw, _ := io.ReadAll(io.LimitReader(body, 4096))
+	var e struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	msg := strings.TrimSpace(string(raw))
+	if json.Unmarshal(raw, &e) == nil && e.Error.Message != "" {
+		msg = e.Error.Message
+	}
+	if r := []rune(msg); len(r) > 300 {
+		msg = string(r[:300])
+	}
+	if msg == "" {
+		return "no details"
+	}
+	return msg
 }

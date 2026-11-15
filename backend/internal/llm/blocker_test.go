@@ -81,7 +81,7 @@ func TestOpenRouterClassifiesBlocker(t *testing.T) {
 }
 
 func TestOpenRouterErrorKinds(t *testing.T) {
-	for status, want := range map[int]error{401: ErrModelAuth, 403: ErrModelAuth, 402: ErrModelAuth, 429: ErrModelBusy} {
+	for status, want := range map[int]error{401: ErrModelAuth, 403: ErrModelForbidden, 402: ErrModelAuth, 429: ErrModelBusy} {
 		o := fakeRouter(t, func(map[string]any) (int, any) { return status, map[string]string{"error": "x"} })
 		if _, err := o.Classify(context.Background(), "x", false, nil, nil); !errors.Is(err, want) || !errors.Is(err, ErrModel) {
 			t.Errorf("%d: %v", status, err)

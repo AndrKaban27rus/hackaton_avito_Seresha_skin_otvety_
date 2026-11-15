@@ -96,6 +96,8 @@ var (
 	ErrModelTimeout = errors.New("model timed out")
 	// ErrModelUnavailable is a 5xx from the provider, such as 504 Gateway Timeout.
 	ErrModelUnavailable = errors.New("model provider unavailable")
+	// ErrModelForbidden is a 403: OpenRouter refuses this key, model or region.
+	ErrModelForbidden = errors.New("model access forbidden")
 )
 
 // Fixture is the deterministic demo model.

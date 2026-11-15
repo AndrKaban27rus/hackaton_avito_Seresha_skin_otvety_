@@ -393,6 +393,8 @@ func modelProblem(err error, msg string) error {
 		msg = "Модель недоступна: OpenRouter не принял ключ. Администратору демо: проверьте LLM_API_KEY или запустите демо без ключа."
 	case errors.Is(err, llm.ErrModelBusy):
 		msg = "Модель сейчас перегружена запросами. Подождите минуту и повторите сообщение."
+	case errors.Is(err, llm.ErrModelForbidden):
+		msg = "Модель недоступна: OpenRouter запретил доступ (403). Частая причина — регион или VPN. Администратору демо: причина в логе сервера, можно запустить демо без ключа."
 	case errors.Is(err, llm.ErrModelUnavailable):
 		msg = "Модель сейчас не отвечает: сбой на стороне OpenRouter. Повторите сообщение через минуту."
 	case errors.Is(err, llm.ErrModelTimeout) || errors.Is(err, context.DeadlineExceeded):
