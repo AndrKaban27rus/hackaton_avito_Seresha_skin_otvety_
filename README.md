@@ -11,7 +11,6 @@ Hack&Change 2026, кейс Авито. AI-buddy — личный чат в им�
 | `backend/` | Go 1.25: HTTP API, правила допуска, адаптер Jira на PostgreSQL, клиент OpenRouter, тесты |
 | `frontend/` | React 19 + TypeScript: интерфейс Slack, TanStack Query, Zod, тесты Vitest |
 | `openspec/` | Спецификация поведения: `starter-pick-go`, `task-progress`, `first-step-and-blockers`, `faq-answers` |
-| `Demo/` | Эталонный прототип на Python и SQLite. Новый стек повторяет его поведение |
 | `docker-compose.yml` | PostgreSQL, API и веб-интерфейс |
 
 ## Запуск через Docker
@@ -240,13 +239,8 @@ cd frontend
 npm run test:coverage
 ```
 
-```bash
-cd Demo
-python -B -m unittest discover -s tests -v
-```
-
-Покрытие строк на 14.11.2026:
-- Go: 90,5% (`internal/...`, без `cmd/api/main.go`);
+Покрытие строк на 15.11.2026:
+- Go: 91,0% (`internal/...`, без `cmd/api/main.go`);
 - фронтенд: 100% строк (Vitest + V8, `src/`, без тестов и `main.tsx`), отчёт в `frontend/coverage/index.html`.
 
 Тесты закрывают:
