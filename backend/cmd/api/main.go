@@ -91,7 +91,10 @@ func run(log *slog.Logger) error {
 
 	var model llm.Model = llm.Fixture{}
 	if key := os.Getenv("LLM_API_KEY"); key != "" {
-		model = llm.NewOpenRouter(os.Getenv("LLM_BASE_URL"), key, os.Getenv("LLM_MODEL"))
+		router := llm.NewOpenRouter(os.Getenv("LLM_BASE_URL"), key, os.Getenv("LLM_MODEL"))
+		router.Log = log
+		model = router
+		log.Info("model list", "models", router.Models)
 	}
 	log.Info("model mode", "mode", model.Mode())
 

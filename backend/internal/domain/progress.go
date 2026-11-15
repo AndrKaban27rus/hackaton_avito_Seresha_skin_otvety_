@@ -109,6 +109,17 @@ func ReminderFor(status string, due, today Day) (string, bool) {
 
 var statusQuestion = regexp.MustCompile(`статус|перев[её]|перевод|ревью|в работу|срок|дедлайн`)
 
+// taskWords mark a message about the current task: its steps, tools and result.
+var taskWords = regexp.MustCompile(`начат|начин|начн|шаг|дальше|делать|сделат|задач|зачем|объясн|метрик|ссылк|` +
+	`инструкц|замер|тест|дашборд|репозитор|стенд|кэш|кеш|фильтр|p95|grafana|bitbucket|jira|confluence|` +
+	`результат|прилож|где посмотр|где найт|где леж|где взят`)
+
+// AsksAboutTask is the rule without a model: does the message ask about the current task?
+// Anything else gets the list of topics instead of the task instruction.
+func AsksAboutTask(message string) bool {
+	return taskWords.MatchString(strings.ToLower(message))
+}
+
 // AsksAboutProgress is the deterministic rule for questions about status or deadline.
 func AsksAboutProgress(message string) bool {
 	return statusQuestion.MatchString(strings.ToLower(message))

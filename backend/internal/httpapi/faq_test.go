@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -135,4 +136,30 @@ func TestModelAnswerCannotClaimFAQSource(t *testing.T) {
 	progress := e.say(elena, "Как отправить задачу на ревью?", "q2")
 	mustContain(t, progress, "статус «Назначена»", "кнопкой «Взять в работу»")
 	mustNotContain(t, progress, "Создай ветку")
+}
+
+func TestKeywordEntryWinsOverModelMixUp(t *testing.T) {
+	e := newEnv(t)
+	elena := e.login("intern_02")
+	e.pick(elena)
+	// The model mixed up the morning call with the work schedule.
+	e.model.classifyFAQ = func(string, []domain.FAQ) (llm.Classification, error) {
+		return llm.Classification{Intent: llm.IntentFAQ, FAQID: "schedule"}, nil
+	}
+	mustContain(t, e.say(elena, "Во сколько у нас созвон по утрам?", "s1"), "Стендап команды «Поиск»")
+	mustContain(t, e.say(elena, "во сколько кончается работа?", "s2"), "Ядро рабочего дня")
+}
+
+func TestUnrelatedQuestionWithTaskGetsTopicsNotInstruction(t *testing.T) {
+	e := newEnv(t)
+	alexey := e.login("intern_01")
+	e.pick(alexey)
+	for i, q := range []string{"как мне уволиться?", "во сколько обед?"} {
+		got := e.say(alexey, q, fmt.Sprintf("u%d", i))
+		mustContain(t, got, "Ещё отвечаю на частые вопросы", buddy.MsgAskPeople[1:])
+		mustNotContain(t, got, "Первый шаг", "Bitbucket")
+	}
+	// Questions about the task still get the instruction.
+	mustContain(t, e.say(alexey, "Где посмотреть эту метрику?", "t1"), "Первый шаг", "Grafana")
+	mustContain(t, e.say(alexey, "во сколько кончается работа?", "t2"), "Ядро рабочего дня")
 }

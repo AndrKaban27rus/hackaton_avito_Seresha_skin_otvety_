@@ -69,3 +69,17 @@ func TestFAQUnderstandsFreeWording(t *testing.T) {
 		}
 	}
 }
+
+func TestAsksAboutTask(t *testing.T) {
+	for _, m := range []string{"С чего начать?", "Где посмотреть эту метрику?", "Что дальше?", "Где лежат тесты?",
+		"Зачем мне эта задача?", "Куда приложить результат?"} {
+		if !domain.AsksAboutTask(m) {
+			t.Errorf("%q is about the task", m)
+		}
+	}
+	for _, m := range []string{"как мне уволиться?", "во сколько обед?", "Привет", "абракадабра"} {
+		if domain.AsksAboutTask(m) {
+			t.Errorf("%q is not about the task", m)
+		}
+	}
+}

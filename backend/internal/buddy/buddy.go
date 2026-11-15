@@ -44,6 +44,8 @@ const (
 	// FAQSource closes every answer taken from the FAQ base.
 	FAQSource = "Ответ из базы частых вопросов команды (тестовые данные)."
 	MsgNoFAQ  = "В базе частых вопросов команды нет ответа на этот вопрос. Спроси руководителя или наставника."
+	// MsgAskPeople closes a reply to a message the bot did not understand.
+	MsgAskPeople = "\nС другими вопросами лучше обратиться к руководителю или наставнику."
 	// ModeFAQ marks a reply copied from the FAQ base: the model only chose the entry.
 	ModeFAQ = "faq"
 )
@@ -391,6 +393,8 @@ func modelProblem(err error, msg string) error {
 		msg = "Модель недоступна: OpenRouter не принял ключ. Администратору демо: проверьте LLM_API_KEY или запустите демо без ключа."
 	case errors.Is(err, llm.ErrModelBusy):
 		msg = "Модель сейчас перегружена запросами. Подождите минуту и повторите сообщение."
+	case errors.Is(err, llm.ErrModelUnavailable):
+		msg = "Модель сейчас не отвечает: сбой на стороне OpenRouter. Повторите сообщение через минуту."
 	case errors.Is(err, llm.ErrModelTimeout) || errors.Is(err, context.DeadlineExceeded):
 		msg = "Модель не ответила вовремя. Повторите сообщение."
 	case !errors.Is(err, llm.ErrModel):
@@ -434,6 +438,15 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 		domain.AsksAboutProgress(question) {
 		if _, ok := domain.MatchFAQ(snap.faq, question); !ok {
 			intent = llm.IntentTaskQuestion
+		}
+	}
+	// FAQ keywords are an explicit signal. When the model also sees a frequent question but
+	// picks another entry (free models mix up «созвон по утрам» and the work schedule),
+	// the keyword entry wins. «No entry fits» stays the model's call: a broad keyword such
+	// as «офис» must not turn a dress code question into the remote work answer.
+	if intent == llm.IntentFAQ && class.FAQID != "" {
+		if f, ok := domain.MatchFAQ(snap.faq, question); ok && f.ID != class.FAQID {
+			class.FAQID = f.ID
 		}
 	}
 	if intent == llm.IntentPickTask && snap.assignment == nil {
@@ -499,10 +512,11 @@ func (s *Service) Chat(ctx context.Context, user, message, requestID string) err
 	case intent == llm.IntentPickTask:
 		pickEmpty = true
 	case snap.assignment != nil:
-		reply = "Могу помочь с текущей задачей. Например, спроси, с чего начать." + faqTopics(snap.faq, "Ещё отвечаю на частые вопросы")
+		reply = "Могу помочь с текущей задачей. Например, спроси, с чего начать." +
+			faqTopics(snap.faq, "Ещё отвечаю на частые вопросы") + MsgAskPeople
 	default:
 		reply = "Могу подобрать стартовую задачу в Jira. Хочешь взять что-нибудь в работу?" +
-			faqTopics(snap.faq, "Ещё отвечаю на частые вопросы")
+			faqTopics(snap.faq, "Ещё отвечаю на частые вопросы") + MsgAskPeople
 	}
 	if s.AfterModel != nil {
 		s.AfterModel()

@@ -94,6 +94,8 @@ var (
 	ErrModelAuth    = errors.New("model key rejected")
 	ErrModelBusy    = errors.New("model rate limited")
 	ErrModelTimeout = errors.New("model timed out")
+	// ErrModelUnavailable is a 5xx from the provider, such as 504 Gateway Timeout.
+	ErrModelUnavailable = errors.New("model provider unavailable")
 )
 
 // Fixture is the deterministic demo model.
@@ -112,7 +114,8 @@ func (Fixture) Classify(_ context.Context, message string, hasAssignment bool, f
 	if f, ok := domain.MatchFAQ(faq, message); ok {
 		return Classification{Intent: IntentFAQ, FAQID: f.ID}, nil
 	}
-	if hasAssignment {
+	// Only a message about the task is a task question: «как мне уволиться?» is not.
+	if hasAssignment && (domain.AsksAboutTask(message) || domain.AsksAboutProgress(message)) {
 		return Classification{Intent: IntentTaskQuestion}, nil
 	}
 	return Classification{Intent: IntentOther}, nil

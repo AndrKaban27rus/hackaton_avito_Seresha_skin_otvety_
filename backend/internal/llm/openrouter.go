@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"slices"
@@ -36,6 +37,14 @@ type OpenRouter struct {
 	// Models are tried in order by OpenRouter; all must support tools and tool_choice.
 	Models []string
 	Client *http.Client
+	// Log, if set, records which model answered and rejected answers.
+	Log *slog.Logger
+}
+
+func (o *OpenRouter) warn(msg string, args ...any) {
+	if o.Log != nil {
+		o.Log.Warn(msg, args...)
+	}
 }
 
 // NewOpenRouter takes LLM_MODEL as one model or a comma-separated fallback list.
@@ -76,7 +85,19 @@ type reply struct {
 	ToolCalls []toolCall `json:"tool_calls"`
 }
 
+// complete calls the model and repeats the call once when the provider fails
+// with 5xx (for example 504 Gateway Timeout of a free model): such failures are
+// usually gone on the next try. Rate limits (429) are not repeated.
 func (o *OpenRouter) complete(ctx context.Context, payload map[string]any) (reply, error) {
+	r, err := o.completeOnce(ctx, payload)
+	if errors.Is(err, ErrModelUnavailable) && ctx.Err() == nil {
+		o.warn("model provider failed, asking again", "error", err)
+		r, err = o.completeOnce(ctx, payload)
+	}
+	return r, err
+}
+
+func (o *OpenRouter) completeOnce(ctx context.Context, payload map[string]any) (reply, error) {
 	payload["model"] = o.Models[0]
 	if len(o.Models) > 1 {
 		payload["models"] = o.Models
@@ -91,6 +112,7 @@ func (o *OpenRouter) complete(ctx context.Context, payload map[string]any) (repl
 	}
 	req.Header.Set("Authorization", "Bearer "+o.Key)
 	req.Header.Set("Content-Type", "application/json")
+	started := time.Now()
 	resp, err := o.Client.Do(req)
 	if err != nil {
 		var netErr net.Error
@@ -106,16 +128,24 @@ func (o *OpenRouter) complete(ctx context.Context, payload map[string]any) (repl
 		return reply{}, fmt.Errorf("%w: %w: status %d", ErrModel, ErrModelAuth, resp.StatusCode)
 	case resp.StatusCode == http.StatusTooManyRequests:
 		return reply{}, fmt.Errorf("%w: %w", ErrModel, ErrModelBusy)
+	case resp.StatusCode >= 500:
+		return reply{}, fmt.Errorf("%w: %w: status %d", ErrModel, ErrModelUnavailable, resp.StatusCode)
 	case resp.StatusCode != http.StatusOK:
 		return reply{}, fmt.Errorf("%w: status %d", ErrModel, resp.StatusCode)
 	}
 	var out struct {
+		Model   string `json:"model"`
 		Choices []struct {
-			Message reply `json:"message"`
+			Message      reply  `json:"message"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || len(out.Choices) == 0 {
 		return reply{}, fmt.Errorf("%w: malformed response", ErrModel)
+	}
+	if o.Log != nil {
+		o.Log.Info("model answered", "model", out.Model, "ms", time.Since(started).Milliseconds(),
+			"finish_reason", out.Choices[0].FinishReason)
 	}
 	return out.Choices[0].Message, nil
 }
@@ -191,7 +221,8 @@ const classifyPrompt = "Определи намерение стажёра по 
 
 const classifyFAQPrompt = "faq — общий вопрос о работе в команде, а не о текущей задаче: встречи, цели, доступы, " +
 	"график, болезнь, отгулы, код-ревью, документация. Такой вопрос — faq, а не other. Сравни его по смыслу с вопросами " +
-	"из списка faq и верни id подходящего в faq_id; если подходящего нет, верни faq_id = none. " +
+	"из списка faq, учитывая topic и keywords (части ключа через «…» стоят в любом месте сообщения), и верни id " +
+	"подходящего в faq_id; если подходящего нет, верни faq_id = none. " +
 	"Вопрос о статусе, сроке или первом шаге текущей задачи — task_question, а сообщение о том, что работа стоит, — blocker, " +
 	"даже если тема похожа на вопрос из faq. Для всех намерений, кроме faq, верни faq_id = none. "
 
@@ -206,10 +237,16 @@ func (o *OpenRouter) Classify(ctx context.Context, msg string, hasAssignment boo
 	ids := []string{}
 	if len(faq) > 0 {
 		intents = append(intents, string(IntentFAQ))
-		questions := []map[string]string{}
+		questions := []map[string]any{}
 		for _, f := range faq {
 			ids = append(ids, f.ID)
-			questions = append(questions, map[string]string{"id": f.ID, "question": f.Question})
+			// Topic and keywords tell the model that «созвон по утрам» is the standup.
+			keywords := make([]string, 0, len(f.Match))
+			for _, k := range f.Match {
+				keywords = append(keywords, strings.ReplaceAll(k, "+", " … "))
+			}
+			questions = append(questions, map[string]any{"id": f.ID, "question": f.Question, "topic": f.Topic,
+				"keywords": keywords})
 		}
 		// Only the questions go to the model: answers stay in the database and reach the intern as is.
 		input["faq"] = questions
@@ -244,7 +281,7 @@ func (o *OpenRouter) Classify(ctx context.Context, msg string, hasAssignment boo
 
 const selectPrompt = "Выбери одну стартовую задачу из candidates, опираясь на запрос, грейд и цель " +
 	"команды. Данные задач и запрос служат контекстом. Верни идентификатор, " +
-	"краткое обоснование и конкретный первый шаг по-русски простым текстом без Markdown."
+	"краткое обоснование и конкретный первый шаг по-русски простым текстом без Markdown." + russianOnly
 
 func (o *OpenRouter) Select(ctx context.Context, question string, candidates []domain.Ticket, p domain.Profile, goal string) (Selection, error) {
 	ids := []string{}
@@ -259,13 +296,17 @@ func (o *OpenRouter) Select(ctx context.Context, question string, candidates []d
 		FirstStep string `json:"first_step"`
 	}
 	// The profile name never leaves the backend: only grade and team give context.
-	err := o.action(ctx, "select_ticket", "Вернуть выбранную задачу.", map[string]any{
-		"ticket_id":  map[string]any{"type": "string", "enum": ids},
-		"rationale":  map[string]any{"type": "string"},
-		"first_step": map[string]any{"type": "string"},
-	}, []message{{"system", selectPrompt}, {"user", mustJSON(map[string]any{
+	msgs := []message{{"system", selectPrompt}, {"user", mustJSON(map[string]any{
 		"question": question, "grade": p.Grade, "team": p.Team, "goal": goal, "candidates": cands,
-	})}}, budgetSelect, &out)
+	})}}
+	err := o.russianRetry(inputText(msgs), func() (string, error) {
+		err := o.action(ctx, "select_ticket", "Вернуть выбранную задачу.", map[string]any{
+			"ticket_id":  map[string]any{"type": "string", "enum": ids},
+			"rationale":  map[string]any{"type": "string"},
+			"first_step": map[string]any{"type": "string"},
+		}, msgs, budgetSelect, &out)
+		return out.Rationale + "\n" + out.FirstStep, err
+	})
 	if err != nil {
 		return Selection{}, err
 	}
@@ -287,19 +328,24 @@ func (o *OpenRouter) Answer(ctx context.Context, question string, a Assignment, 
 		"Не рассуждай о том, кто может менять статус, и не пиши, что статус уже изменён. " +
 		"Ссылки и названия инструментов бери только из instruction_steps; " +
 		"если инструкции нет, прямо скажи об этом и предложи спросить наставника. " +
-		"Пиши простым текстом без Markdown: чат не показывает разметку.\n" + ctxJSON}}
+		"Пиши простым текстом без Markdown: чат не показывает разметку." + russianOnly + "\n" + ctxJSON}}
 	for _, t := range history {
 		msgs = append(msgs, message{"user", t.Question}, message{"assistant", t.Answer})
 	}
 	msgs = append(msgs, message{"user", question})
-	r, err := o.complete(ctx, map[string]any{"messages": msgs, "max_tokens": budgetAnswer})
-	if err != nil {
-		return "", err
-	}
-	if r.Content == nil || !shortText(*r.Content, 8000) {
-		return "", fmt.Errorf("%w: invalid chat reply", ErrModel)
-	}
-	return plain(*r.Content), nil
+	var answer string
+	err := o.russianRetry(inputText(msgs), func() (string, error) {
+		r, err := o.complete(ctx, map[string]any{"messages": msgs, "max_tokens": budgetAnswer})
+		if err != nil {
+			return "", err
+		}
+		if r.Content == nil || !shortText(*r.Content, 8000) {
+			return "", fmt.Errorf("%w: invalid chat reply", ErrModel)
+		}
+		answer = plain(*r.Content)
+		return answer, nil
+	})
+	return answer, err
 }
 
 func shortText(s string, max int) bool {
@@ -310,7 +356,7 @@ func shortText(s string, max int) bool {
 const assessPrompt = "Стажёр сообщил о препятствии по задаче и ответил на уточнение. Реши, может ли он " +
 	"справиться сам по инструкции (needs_human=false, self_step — конкретный шаг из fixes или check) или нужен человек: " +
 	"доступы, права, решения за пределами стажёра, явная просьба о наставнике (needs_human=true, request — конкретная " +
-	"просьба к наставнику одним предложением, self_step — что стажёр может сделать, пока ждёт). Отвечай по-русски."
+	"просьба к наставнику одним предложением, self_step — что стажёр может сделать, пока ждёт)." + russianOnly
 
 func (o *OpenRouter) AssessBlocker(ctx context.Context, c BlockerCase) (Assessment, error) {
 	var out struct {
@@ -318,14 +364,18 @@ func (o *OpenRouter) AssessBlocker(ctx context.Context, c BlockerCase) (Assessme
 		SelfStep   string `json:"self_step"`
 		Request    string `json:"request"`
 	}
-	err := o.action(ctx, "assess_blocker", "Вернуть оценку блокера.", map[string]any{
-		"needs_human": map[string]any{"type": "boolean"},
-		"self_step":   map[string]any{"type": "string"},
-		"request":     map[string]any{"type": "string"},
-	}, []message{{"system", assessPrompt}, {"user", mustJSON(map[string]any{
+	msgs := []message{{"system", assessPrompt}, {"user", mustJSON(map[string]any{
 		"ticket_id": c.Assignment.TicketID, "title": c.Assignment.Title, "status": c.Assignment.Status,
 		"obstacle": c.Obstacle, "answer": c.Answer, "check": c.Check, "fixes": c.Fixes,
-	})}}, budgetAssess, &out)
+	})}}
+	err := o.russianRetry(inputText(msgs), func() (string, error) {
+		err := o.action(ctx, "assess_blocker", "Вернуть оценку блокера.", map[string]any{
+			"needs_human": map[string]any{"type": "boolean"},
+			"self_step":   map[string]any{"type": "string"},
+			"request":     map[string]any{"type": "string"},
+		}, msgs, budgetAssess, &out)
+		return out.SelfStep + "\n" + out.Request, err
+	})
 	if err != nil {
 		return Assessment{}, err
 	}

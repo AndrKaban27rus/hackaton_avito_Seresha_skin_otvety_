@@ -289,8 +289,9 @@ func TestOpenRouterClassifiesFAQ(t *testing.T) {
 		msgs := p["messages"].([]any)
 		system := msgs[0].(map[string]any)["content"].(string)
 		user := msgs[1].(map[string]any)["content"].(string)
-		if !strings.Contains(user, `{"id":"vacation","question":"Как взять отгул?"}`) || strings.Contains(user, "Согласуй") {
-			t.Errorf("only questions go to the model: %s", user)
+		if !strings.Contains(user, `"id":"vacation","keywords":["отгул"],"question":"Как взять отгул?"`) ||
+			strings.Contains(user, "Согласуй") {
+			t.Errorf("questions and keywords go to the model, answers do not: %s", user)
 		}
 		if !strings.Contains(system, "faq_id = none") {
 			t.Errorf("system = %s", system)

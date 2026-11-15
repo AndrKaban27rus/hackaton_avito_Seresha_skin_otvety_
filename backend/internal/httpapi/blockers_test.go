@@ -278,6 +278,7 @@ func TestModelErrorsTellWhatToDo(t *testing.T) {
 		"OpenRouter не принял ключ":        fmt.Errorf("%w: %w", llm.ErrModel, llm.ErrModelAuth),
 		"перегружена запросами":            fmt.Errorf("%w: %w", llm.ErrModel, llm.ErrModelBusy),
 		"Модель не ответила вовремя":       fmt.Errorf("%w: %w", llm.ErrModel, llm.ErrModelTimeout),
+		"сбой на стороне OpenRouter":       fmt.Errorf("%w: %w", llm.ErrModel, llm.ErrModelUnavailable),
 		"Не удалось определить, что нужно": llm.ErrModel,
 	}
 	for want, err := range cases {
